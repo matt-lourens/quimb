@@ -501,14 +501,23 @@ class JaxHandler:
 
     def setup_fn(self, fn):
         jax = get_jax()
+        # if self.jit_fn:
+        #     self._backend_fn = jax.jit(fn, backend=self.device)
+        #     self._value_and_grad = jax.jit(
+        #         jax.value_and_grad(fn), backend=self.device
+        #     )
+        # else:
+        #     self._backend_fn = fn
+        #     self._value_and_grad = jax.value_and_grad(fn)
+        # compile a function with signature (arrays, loss_var)
         if self.jit_fn:
             self._backend_fn = jax.jit(fn, backend=self.device)
             self._value_and_grad = jax.jit(
-                jax.value_and_grad(fn), backend=self.device
+                jax.value_and_grad(fn, argnums=0), backend=self.device
             )
         else:
             self._backend_fn = fn
-            self._value_and_grad = jax.value_and_grad(fn)
+            self._value_and_grad = jax.value_and_grad(fn, argnums=0)
 
         self._setup_hessp(fn)
 
@@ -523,12 +532,12 @@ class JaxHandler:
 
         self._hvp = hvp
 
-    def value(self, arrays):
+    def value(self, arrays, loss_var):
         jax_arrays = tree_map(self.to_constant, arrays)
-        return to_numpy(self._backend_fn(jax_arrays))
+        return to_numpy(self._backend_fn(jax_arrays, loss_var))
 
-    def value_and_grad(self, arrays):
-        loss, grads = self._value_and_grad(arrays)
+    def value_and_grad(self, arrays, loss_var):
+        loss, grads = self._value_and_grad(arrays, loss_var)
         return (
             loss,
             tree_map(lambda x: to_numpy(x.conj()), grads),
@@ -955,8 +964,7 @@ class ADAM:
 
 
 class CADAM(ADAM):
-    """Cautious ADAM - https://arxiv.org/abs/2411.16085.
-    """
+    """Cautious ADAM - https://arxiv.org/abs/2411.16085."""
 
     def __init__(self):
         super().__init__(cautious=True)
@@ -1140,9 +1148,9 @@ class MakeArrayFn:
         self.norm_fn = norm_fn
         self.autodiff_backend = autodiff_backend
 
-    def __call__(self, arrays):
+    def __call__(self, arrays, loss_var):
         tn_compute = inject_variables(arrays, self.tn_opt)
-        return self.loss_fn(self.norm_fn(tn_compute))
+        return self.loss_fn(self.norm_fn(tn_compute), loss_var)
 
 
 def identity_fn(x):
@@ -1237,6 +1245,9 @@ class TNOptimizer:
         callback=None,
         **backend_opts,
     ):
+        # TODO new
+        self._loss_var = None
+        # TODO new
         self.progbar = progbar
         self.tags = tags
         self.shared_tags = shared_tags
@@ -1298,6 +1309,9 @@ class TNOptimizer:
         self.bounds = bounds
         self.optimizer = optimizer
         self.callback = callback
+
+    def set_loss_var(self, v):
+        self._loss_var = v
 
     def _set_tn(self, tn):
         # work out which tensors to optimize and get the underlying data
@@ -1368,7 +1382,7 @@ class TNOptimizer:
         """The value of the loss function at vector ``x``."""
         self.vectorizer.vector[:] = x
         arrays = self.vectorizer.unpack()
-        self.loss = self.handler.value(arrays).item()
+        self.loss = self.handler.value(arrays, self._loss_var).item()
         self.losses.append(self.loss)
         self.lgrdm.update(float(self.loss))
         self.loss_diffs.append(self.lgrdm.value)
@@ -1382,7 +1396,7 @@ class TNOptimizer:
         """The value and gradient of the loss function at vector ``x``."""
         self.vectorizer.vector[:] = x
         arrays = self.vectorizer.unpack()
-        result, grads = self.handler.value_and_grad(arrays)
+        result, grads = self.handler.value_and_grad(arrays, self._loss_var)
         self._n += 1
         self.loss = result.item()
         self.losses.append(self.loss)
@@ -1502,7 +1516,9 @@ class TNOptimizer:
         return {
             "scipy": self.optimize_scipy,
             "nlopt": self.optimize_nlopt,
-        }[optlib](n=n, tol=tol, jac=jac, hessp=hessp, **options)
+        }[
+            optlib
+        ](n=n, tol=tol, jac=jac, hessp=hessp, **options)
 
     def optimize_scipy(self, n, tol=None, jac=True, hessp=False, **options):
         """Scipy based optimization, see
