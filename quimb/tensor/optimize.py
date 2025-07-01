@@ -905,6 +905,12 @@ class ADAM:
             self._v = np.zeros_like(x)
         return self._v
 
+    def reset(self):
+        """Clear moment buffers and iteration counter."""
+        self._i = 0
+        self._m = None
+        self._v = None
+
     def __call__(
         self,
         fun,
@@ -1080,6 +1086,12 @@ class ADABELIEF:
         if self._s is None:
             self._s = np.zeros_like(x)
         return self._s
+
+    def reset(self):
+        """Clear moment buffers and iteration counter."""
+        self._i = 0
+        self._m = None
+        self._s = None
 
     def __call__(
         self,
