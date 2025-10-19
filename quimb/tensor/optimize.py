@@ -501,15 +501,7 @@ class JaxHandler:
 
     def setup_fn(self, fn):
         jax = get_jax()
-        # if self.jit_fn:
-        #     self._backend_fn = jax.jit(fn, backend=self.device)
-        #     self._value_and_grad = jax.jit(
-        #         jax.value_and_grad(fn), backend=self.device
-        #     )
-        # else:
-        #     self._backend_fn = fn
-        #     self._value_and_grad = jax.value_and_grad(fn)
-        # compile a function with signature (arrays, loss_var)
+        # compile a function with signature (arrays) or (arrays, loss_var)
         if self.jit_fn:
             self._backend_fn = jax.jit(fn, backend=self.device)
             self._value_and_grad = jax.jit(
@@ -1178,7 +1170,10 @@ class MakeArrayFn:
 
     def __call__(self, arrays, loss_var):
         tn_compute = inject_variables(arrays, self.tn_opt)
-        return self.loss_fn(self.norm_fn(tn_compute), loss_var)
+        if loss_var is None:
+            return self.loss_fn(self.norm_fn(tn_compute))
+        else:
+            return self.loss_fn(self.norm_fn(tn_compute), loss_var)
 
 
 def identity_fn(x):
@@ -1273,9 +1268,7 @@ class TNOptimizer:
         callback=None,
         **backend_opts,
     ):
-        # TODO new
         self._loss_var = None
-        # TODO new
         self.progbar = progbar
         self.tags = tags
         self.shared_tags = shared_tags
