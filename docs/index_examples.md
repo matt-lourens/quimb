@@ -1,12 +1,9 @@
-# Examples
+# Tensor Network Examples
 
 ```{toctree}
 :numbered:
 :maxdepth: 2
 
-./examples/ex_2d
-./examples/ex_quench
-./examples/ex_distributed_shift_invert
 ./examples/ex_tn_TRG
 ./examples/ex_tn_rand_uni_gate_graphs
 ./examples/ex_dmrg_periodic
@@ -21,5 +18,27 @@
 ./examples/ex_tn_tensor_fitting
 ./examples/ex_circuit_to_mpo
 ./examples/ex_htn_to_tn_2d
+./examples/ex_tracing_tn_functions
+```
+
+
+# Matrix Examples
+
+```{toctree}
+:numbered:
+:maxdepth: 2
+
+./examples/ex_2d
+./examples/ex_quench
+./examples/ex_distributed_shift_invert
+```
+
+
+# Other Examples
+
+```{toctree}
+:numbered:
+:maxdepth: 2
+
 ./examples/schematic-demo
 ```
